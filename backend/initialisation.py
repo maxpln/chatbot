@@ -62,23 +62,40 @@ async def init_chat_settings() -> cl.ChatSettings:
     return settings
 
 
-async def create_actions() -> List[cl.Action]:
-    """Create a list of possible actions."""
-    lst_actions = [
-        cl.Action(
-            name="resume",
-            icon="mouse-pointer-click",
-            tooltip="Pour générer un résumé d'un document.",
-            payload={},
-            label="Résumé",
-        )
-    ]
-    return lst_actions
-
-
 async def create_commands() -> List[Dict[str, str]]:
     """Create a list of possible actions."""
     lst_commands = [
         {"id": "resume", "icon": "pen-line", "description": "Résumer un document."},
     ]
     return lst_commands
+
+
+async def create_actions_for_doc(files: List) -> List[cl.Action]:
+    """Create a list of possible actions."""
+    lst_file_path = [file.path for file in files]
+    return [
+        cl.Action(
+            name="resume",
+            icon="mouse-pointer-click",
+            tooltip="Pour générer un résumé du document.",
+            payload={"lst_file_path": lst_file_path},
+            label="Résumé",
+        )
+    ]
+
+
+async def ask_action_on_doc(files: List) -> str:
+    """Ask the user what to do with the document.
+
+    Other way to do it :
+    await cl.Message(
+        content="Que voulez faire avec ce document ?",
+        actions=lst_actions,
+    ).send()
+    """
+    lst_actions = await create_actions_for_doc(files)
+    action = await cl.AskActionMessage(
+        content="Que voulez faire avec ce document ?",
+        actions=lst_actions,
+    ).send()
+    return action.get("name") if action else None

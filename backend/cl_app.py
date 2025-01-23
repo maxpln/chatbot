@@ -8,8 +8,10 @@ from initialisation import (
     create_chat_profiles,
     create_starters,
     create_commands,
+    ask_action_on_doc,
 )
 from chainlit.types import ThreadDict
+from generate_response import request_llm, generate_resume
 
 
 @cl.password_auth_callback
@@ -82,20 +84,29 @@ async def settings_updated() -> None:
 async def main(message: cl.Message) -> None:
     """Generate a response to the user's message."""
 
-    client = cl.user_session.get("model_client")
-    settings = cl.user_session.get("settings")
+    if message.command == "resume":
+        if message.elements:
+            await generate_resume(message.elements)
+        elif not message.elements:
+            files = await cl.AskFileMessage(
+                content="Veuillez charger un fichier à résumer :", accept=["text/plain"]
+            ).send()
+            if files:
+                await generate_resume(files)
 
-    # Call the model to generate a response and stream the response to the user
-    msg = cl.Message(content="", author="chatbot")
-    stream = await client.chat.completions.create(
-        messages=cl.chat_context.to_openai(),
-        stream=True,
-        **settings,
-    )
-    async for part in stream:
-        if token := part.choices[0].delta.content or "":
-            await msg.stream_token(token)
-    await msg.update()
+    elif message.command is None and message.elements != []:
+        action = await ask_action_on_doc(files=message.elements)
+        if action == "resume":
+            await generate_resume(message.elements)
+
+    # No command, no file, just a message
+    else:
+        # Generate a response to the user's message based on history
+        await request_llm(
+            lst_messages=cl.chat_context.to_openai(),
+            client=cl.user_session.get("model_client"),
+            settings=cl.user_session.get("settings"),
+        )
 
 
 @cl.on_stop
