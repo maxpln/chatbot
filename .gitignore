@@ -1,2 +1,5 @@
 /backend/.env
 /backend/.files/
+/backend/.chainlit/translations/
+/backend/__pycache__/
+.idea/

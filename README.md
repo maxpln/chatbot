@@ -11,7 +11,11 @@ cd backend
 chainlit run cl_app.py -w
 ````
 
+La persitstence des données est gérée avec LiteralAI : https://docs.chainlit.io/llmops/literalai
+
 Les variables d'environnement sont définies dans le fichier `.env` dans le dossier backend.
+
+Choix des icones : https://lucide.dev/icons/
 
 ## LLM
 
