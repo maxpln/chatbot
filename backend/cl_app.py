@@ -1,21 +1,22 @@
+import os
 from typing import List
 from fastapi import Request, Response
 import chainlit as cl
-from openai import AsyncOpenAI
-import os
 from initialisation import (
     init_chat_settings,
     create_chat_profiles,
     create_starters,
     create_commands,
     ask_action_on_doc,
+    ask_files,
 )
 from chainlit.types import ThreadDict
-from generate_response import request_llm, generate_resume
+from generate_response import request_llm, generate_resume, generate_qa
+from preprocessing import create_index
 
 
 @cl.password_auth_callback
-def auth_callback(username: str, password: str):
+def auth_callback(username: str, password: str) -> [cl.User, None]:
     """Check the username and password provided by the user.
     Basic authentication to enable features with data persistence.
     """
@@ -28,7 +29,7 @@ def auth_callback(username: str, password: str):
 
 
 @cl.on_logout
-def delete_cookie(request: Request, response: Response):
+def delete_cookie(request: Request, response: Response) -> None:
     response.delete_cookie("my_cookie")
 
 
@@ -47,12 +48,6 @@ async def set_starters() -> List[cl.Starter]:
 @cl.on_chat_start
 async def on_chat_start() -> None:
     """Beginning of a new chat session."""
-    # Initialize the model
-    model_client = AsyncOpenAI(
-        base_url=os.getenv("OLLAMA_URL"), api_key=os.getenv("OPENAI_API_KEY")
-    )
-    cl.user_session.set("model_client", model_client)
-    cl.instrument_openai()
     # Initialize the chat settings for inference
     await init_chat_settings()
     await settings_updated()
@@ -61,7 +56,7 @@ async def on_chat_start() -> None:
     await cl.context.emitter.set_commands(lst_commands)
     # Add system prompt to the chat context
     cl.chat_context.add(
-        cl.Message(content="You are a helpful assistant.", type="system_message")
+        cl.Message(content=os.getenv("SYSTEM_PROMPT"), type="system_message")
     )
 
 
@@ -77,6 +72,7 @@ async def settings_updated() -> None:
     # Create settings for the inference parameters and add the model name
     settings = cl.user_session.get("chat_settings")
     settings["model"] = cl.user_session.get("chat_profile")
+    settings["max_tokens"] = int(settings["max_tokens"])
     cl.user_session.set("settings", settings)
 
 
@@ -85,27 +81,40 @@ async def main(message: cl.Message) -> None:
     """Generate a response to the user's message."""
 
     if message.command == "resume":
-        if message.elements:
+        if len(message.elements) != 0:
             await generate_resume(message.elements)
-        elif not message.elements:
-            files = await cl.AskFileMessage(
-                content="Veuillez charger un fichier à résumer :", accept=["text/plain"]
-            ).send()
-            if files:
-                await generate_resume(files)
+        else:
+            lst_files = await ask_files("Veuillez charger un fichier à résumer :")
+            if lst_files:
+                await generate_resume(lst_files)
 
+    elif message.command == "qa":
+        index = None
+        if len(message.elements) != 0:
+            index = await create_index(message.elements)
+        else:
+            lst_files = await ask_files(
+                "Veuillez charger un fichier sur lequel poser des questions :"
+            )
+            if lst_files:
+                index = await create_index(lst_files)
+        if index:
+            await generate_qa(index)
+
+    # No command, but files
     elif message.command is None and message.elements != []:
         action = await ask_action_on_doc(files=message.elements)
         if action == "resume":
             await generate_resume(message.elements)
+        elif action == "qa":
+            index = await create_index(message.elements)
+            await generate_qa(index)
 
     # No command, no file, just a message
     else:
         # Generate a response to the user's message based on history
         await request_llm(
             lst_messages=cl.chat_context.to_openai(),
-            client=cl.user_session.get("model_client"),
-            settings=cl.user_session.get("settings"),
         )
 
 

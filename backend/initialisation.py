@@ -13,6 +13,16 @@ async def create_chat_profiles() -> List[cl.ChatProfile]:
             markdown_description=f"{model_name} lancé avec ollama.",
             icon="/public/ollama.png",
         ),
+        cl.ChatProfile(
+            name="Mon 2ème modèle",
+            markdown_description="Modèle fictif",
+            icon="/public/ollama.png",
+        ),
+        cl.ChatProfile(
+            name="LLM + RAG",
+            markdown_description="Ma base de RAG permanent avec un modèle associé ?",
+            icon="/public/ollama.png",
+        ),
     ]
     return lst_chat_profiles
 
@@ -23,10 +33,9 @@ async def create_starters() -> List[cl.Starter]:
         cl.Starter(
             label="Hello",
             message="Hello, who are you ?",
-            icon="/public/ollama.png",
         ),
         cl.Starter(
-            label="Write a Pyhton code to create a chatbot.",
+            label="Write a Python code to create a chatbot.",
             message="Can you write a Python script to create a chatbot that can answer questions about machine learning.",
         ),
         cl.Starter(
@@ -57,6 +66,14 @@ async def init_chat_settings() -> cl.ChatSettings:
                 max=1,
                 step=0.1,
             ),
+            Slider(
+                id="max_tokens",
+                label="Max Tokens",
+                initial=4096,
+                min=100,
+                max=128000,
+                step=1,
+            ),
         ]
     ).send()
     return settings
@@ -66,36 +83,41 @@ async def create_commands() -> List[Dict[str, str]]:
     """Create a list of possible actions."""
     lst_commands = [
         {"id": "resume", "icon": "pen-line", "description": "Résumer un document."},
+        {
+            "id": "qa",
+            "icon": "pen-line",
+            "description": "Poser des questions sur un document.",
+        },
     ]
     return lst_commands
 
 
-async def create_actions_for_doc(files: List) -> List[cl.Action]:
-    """Create a list of possible actions."""
-    lst_file_path = [file.path for file in files]
-    return [
+async def ask_action_on_doc(files: List) -> str:
+    """Ask the user what to do with the document."""
+    lst_actions = [
         cl.Action(
             name="resume",
             icon="mouse-pointer-click",
             tooltip="Pour générer un résumé du document.",
-            payload={"lst_file_path": lst_file_path},
+            payload={},
             label="Résumé",
-        )
+        ),
+        cl.Action(
+            name="qa",
+            icon="mouse-pointer-click",
+            tooltip="Pour poser des questions sur le document.",
+            payload={},
+            label="Question Answering",
+        ),
     ]
-
-
-async def ask_action_on_doc(files: List) -> str:
-    """Ask the user what to do with the document.
-
-    Other way to do it :
-    await cl.Message(
-        content="Que voulez faire avec ce document ?",
-        actions=lst_actions,
-    ).send()
-    """
-    lst_actions = await create_actions_for_doc(files)
     action = await cl.AskActionMessage(
         content="Que voulez faire avec ce document ?",
         actions=lst_actions,
     ).send()
-    return action.get("name") if action else None
+    return action.get("name") if action else False
+
+
+async def ask_files(content: str = None):
+    """Ask the user to upload a file."""
+    files = await cl.AskFileMessage(content=content, accept=["text/plain"]).send()
+    return files if files else False

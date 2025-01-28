@@ -25,4 +25,25 @@ Choix des icones : https://lucide.dev/icons/
 ollama run deepseek-r1:1.5b
 ```
 
+## TODO
+
+* RAG avec base weaviate
+* Tester modèles multimodaux (gestion fichiers image /texte)
+* RAG gitlab
+* RAG with database
+
+## Outils Python installés
+
+* pre-commit : exécuter avant chaque commit
+````bash
+# Install pre-commit into yout git hooks
+pre-commit install
+# Run all pre-commit hooks on the repository
+pre-commit run --all-files
+````
+* ruff
+```bash
+ruff check
+ruff format
+```
 
